@@ -155,9 +155,10 @@
             
             inputs.forEach(input => {
                 const key = input.getAttribute('data-key');
-                const val = parseFloat(input.value);
-                // default to 0 if NaN or empty
-                dataToSave[key] = isNaN(val) ? 0 : val;
+               let val = input.value.trim();
+
+// default to "0" if empty
+dataToSave[key] = val === "" ? "0" : val;
             });
 
             try {
