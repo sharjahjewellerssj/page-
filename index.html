@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Adjust Rates</title>
+</head>
+<body>
+  <h2>Update Rates</h2>
+
+  <div id="form"></div>
+  <br>
+  <button onclick="updateData()">Save</button>
+
+  <script>
+    const TOKEN = "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";
+    const OWNER = "my-jewel";
+    const REPO = "app";
+    const FILE_PATH = "adjust.json";
+
+    let currentSha = "";
+    let jsonData = {};
+
+    async function loadData() {
+      const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`
+        }
+      });
+
+      const data = await res.json();
+      currentSha = data.sha;
+
+      const content = JSON.parse(atob(data.content));
+      jsonData = content;
+
+      const form = document.getElementById("form");
+      form.innerHTML = "";
+
+      Object.keys(content).forEach(key => {
+        form.innerHTML += `
+          <label>${key}</label><br>
+          <input type="number" id="${key}" value="${content[key]}" /><br><br>
+        `;
+      });
+    }
+
+    async function updateData() {
+      const updated = {};
+
+      Object.keys(jsonData).forEach(key => {
+        updated[key] = Number(document.getElementById(key).value);
+      });
+
+      await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Update rates",
+          content: btoa(JSON.stringify(updated, null, 2)),
+          sha: currentSha
+        })
+      });
+
+      alert("Updated successfully!");
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
