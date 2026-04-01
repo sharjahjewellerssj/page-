@@ -1,72 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Adjust Rates</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Rates Adjustments Admin</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 30px; }
+        h1 { margin: 0; color: #1a2445; font-size: 26px; }
+        .status { padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; background: #e6f4ea; color: #1e8e3e; }
+        .status.loading { background: #fff0d4; color: #b05c0d; }
+        
+        .section-title { font-size: 20px; color: #1a2445; border-bottom: 2px solid #d4af37; padding-bottom: 5px; margin-top: 30px; margin-bottom: 15px; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .card { background: #fafafa; border: 1px solid #eaeaea; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .card label { font-size: 14px; font-weight: 600; color: #555; margin-bottom: 10px; }
+        .card input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 18px; font-weight: bold; color: #1a2445; transition: border-color 0.2s; }
+        .card input:focus { border-color: #d4af37; outline: none; box-shadow: 0 0 5px rgba(212, 175, 55, 0.3); }
+        
+        .btn-wrapper { margin-top: 40px; display: flex; justify-content: center; }
+        .btn { background: #1a2445; color: #d4af37; border: none; padding: 15px 40px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(26, 36, 69, 0.3); }
+        .btn:hover { background: #0f1835; transform: translateY(-2px); }
+        .btn:disabled { background: #ccc; color: #fff; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        #toast { visibility: hidden; min-width: 250px; background-color: #1e8e3e; color: #fff; text-align: center; border-radius: 8px; padding: 16px; font-weight: bold; font-size: 16px; position: fixed; z-index: 1000; bottom: 30px; left: 50%; transform: translateX(-50%); }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        #toast.error { background-color: #d93025; }
+        
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
 </head>
 <body>
-  <h2>Update Rates</h2>
+    <div class="container">
+        <div class="header">
+            <h1>Admin Panel: Live Rates Adjustments</h1>
+            <div id="statusIndicator" class="status loading">Loading data...</div>
+        </div>
 
-  <div id="form"></div>
-  <br>
-  <button onclick="updateData()">Save</button>
+        <div id="content">
+            <!-- Dynamic Groups will be inserted here -->
+        </div>
 
-  <script>
-    const TOKEN = "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";
-    const OWNER = "my-jewel";
-    const REPO = "app";
-    const FILE_PATH = "adjust.json";
+        <div class="btn-wrapper">
+            <button id="saveBtn" class="btn" disabled>Save Adjustments to Live App</button>
+        </div>
+    </div>
 
-    let currentSha = "";
-    let jsonData = {};
+    <div id="toast">Saved Successfully!</div>
 
-    async function loadData() {
-      const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
-        headers: {
-          Authorization: `Bearer ${TOKEN}`
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+        // Your Firebase config precisely ported from the React Native app
+        const firebaseConfig = {
+            apiKey: "AIzaSyBRaCm8nP_rmN9QNQMAPg0ebKmN5nHKp1Q",
+            authDomain: "sjapp-30321.firebaseapp.com",
+            projectId: "sjapp-30321",
+            storageBucket: "sjapp-30321.firebasestorage.app",
+            messagingSenderId: "897139797873",
+            appId: "1:897139797873:web:7a82cdcaf0345265d150d0",
+            measurementId: "G-3XG02NE4F5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const adjustmentsDocRef = doc(db, 'settings', 'adjustments');
+
+        const groups = {
+            "Gold Base Rates": [
+                "Gold 24K MCX", "Gold 22K MCX", "Gold 18K MCX",
+                "Gold 22K Ornament", "Gold 18K Ornament", "Gold 14K Ornament",
+            ],
+            "Silver Base Rates": [
+                "Silver 999 MCX", "Silver 999 Per Gram"
+            ],
+            "MMTC Silver Collection": [
+                "MMTC Silver 10 GM 999", "MMTC Silver 20 GM 999", "MMTC Silver 50 GM 999",
+                "MMTC Silver 100 GM 999", "MMTC Silver 250 GM 999", "MMTC Silver 500 GM 999", "MMTC Silver 1000 GM 999"
+            ],
+            "MMTC Gold Collection & Pasa Bhav": [
+                "Gold 24K 1GM(Pasa Bhav)", "MMTC Gold Coin 0.5 GM", "MMTC Gold Coin 1 GM",
+                "MMTC Gold Coin 2 GM", "MMTC Gold Coin 4 GM", "MMTC Gold Coin 5 GM",
+                "MMTC Gold Coin 8 GM", "MMTC PAMP 10 GM", "MMTC Gold Coin 20 GM",
+                "MMTC Gold Coin 50 GM", "MMTC Gold Coin 100 GM"
+            ]
+        };
+
+        const contentDiv = document.getElementById('content');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusInd = document.getElementById('statusIndicator');
+
+        // Render HTML structure
+        for (const [groupName, keys] of Object.entries(groups)) {
+            const section = document.createElement('div');
+            section.innerHTML = `<h2 class="section-title">${groupName}</h2>`;
+            
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            
+            for (const key of keys) {
+                const safeId = key.replace(/[^a-zA-Z0-9]/g, '_');
+                grid.innerHTML += `
+                    <div class="card">
+                        <label for="${safeId}">${key}</label>
+                        <input type="number" step="any" id="${safeId}" data-key="${key}" value="0">
+                    </div>
+                `;
+            }
+            
+            section.appendChild(grid);
+            contentDiv.appendChild(section);
         }
-      });
 
-      const data = await res.json();
-      currentSha = data.sha;
+        async function fetchInitialData() {
+            try {
+                const docSnap = await getDoc(adjustmentsDocRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    const inputs = document.querySelectorAll('input[type="number"]');
+                    inputs.forEach(input => {
+                        const key = input.getAttribute('data-key');
+                        if (data[key] !== undefined) {
+                            input.value = data[key];
+                        }
+                    });
+                }
+                statusInd.textContent = "Connected to Live App";
+                statusInd.className = "status connected";
+                saveBtn.disabled = false;
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                statusInd.textContent = "Error loading data. Check console.";
+                statusInd.className = "status loading";
+            }
+        }
 
-      const content = JSON.parse(atob(data.content));
-      jsonData = content;
+        function showToast(message, isError = false) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = isError ? "show error" : "show";
+            setTimeout(() => { toast.className = toast.className.replace(/show|error/g, ""); }, 3000);
+        }
 
-      const form = document.getElementById("form");
-      form.innerHTML = "";
+        saveBtn.addEventListener('click', async () => {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving Context...';
+            
+            const dataToSave = {};
+            const inputs = document.querySelectorAll('input[type="number"]');
+            
+            inputs.forEach(input => {
+                const key = input.getAttribute('data-key');
+                const val = parseFloat(input.value);
+                // default to 0 if NaN or empty
+                dataToSave[key] = isNaN(val) ? 0 : val;
+            });
 
-      Object.keys(content).forEach(key => {
-        form.innerHTML += `
-          <label>${key}</label><br>
-          <input type="number" id="${key}" value="${content[key]}" /><br><br>
-        `;
-      });
-    }
+            try {
+                await setDoc(adjustmentsDocRef, dataToSave, { merge: true });
+                showToast("Adjustments applied successfully!");
+            } catch (error) {
+                console.error("Error writing document:", error);
+                showToast("Failed to save!", true);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Adjustments to Live App';
+            }
+        });
 
-    async function updateData() {
-      const updated = {};
-
-      Object.keys(jsonData).forEach(key => {
-        updated[key] = Number(document.getElementById(key).value);
-      });
-
-      await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: "Update rates",
-          content: btoa(JSON.stringify(updated, null, 2)),
-          sha: currentSha
-        })
-      });
-
-      alert("Updated successfully!");
-    }
-
-    loadData();
-  </script>
+        // Initialize fetching on page load
+        fetchInitialData();
+    </script>
 </body>
 </html>
