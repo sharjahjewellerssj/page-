@@ -30,6 +30,69 @@
         input:focus + .slider { box-shadow: 0 0 1px #1e8e3e; }
         input:checked + .slider:before { transform: translateX(20px); }
 
+        /* ── Notice / Remark Section ── */
+        .notice-card {
+            background: #fffbf0;
+            border: 2px solid #d4af37;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 10px;
+        }
+        .notice-card .notice-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .notice-card .notice-label {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a2445;
+        }
+        .notice-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #555;
+        }
+        .notice-toggle-wrap .switch { width: 48px; height: 24px; }
+        .notice-toggle-wrap .slider:before { height: 18px; width: 18px; }
+        .notice-toggle-wrap input:checked + .slider:before { transform: translateX(24px); }
+
+        .notice-status-badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            background: #fee2e2;
+            color: #b91c1c;
+            transition: all 0.3s;
+        }
+        .notice-status-badge.on { background: #dcfce7; color: #15803d; }
+
+        #noticeText {
+            width: 100%;
+            min-height: 90px;
+            padding: 14px;
+            border: 1px solid #d4af37;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            background: #fff;
+            color: #1a2445;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        #noticeText:focus { border-color: #b8960a; outline: none; box-shadow: 0 0 6px rgba(212,175,55,0.4); }
+        .notice-hint {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
         .btn-wrapper { margin-top: 40px; display: flex; justify-content: center; }
         .btn { background: #1a2445; color: #d4af37; border: none; padding: 15px 40px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 10px rgba(26, 36, 69, 0.3); }
         .btn:hover { background: #0f1835; transform: translateY(-2px); }
@@ -50,6 +113,23 @@
             <div id="statusIndicator" class="status loading">Loading data...</div>
         </div>
 
+        <!-- ── Notice / Remark Section ── -->
+        <h2 class="section-title">📢 App Notice / Remark</h2>
+        <div class="notice-card">
+            <div class="notice-top">
+                <span class="notice-label">Popup Notification for Users</span>
+                <div class="notice-toggle-wrap">
+                    <span id="noticeStatusBadge" class="notice-status-badge">OFF</span>
+                    <label class="switch" title="Toggle notice popup on/off">
+                        <input type="checkbox" id="noticeToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <textarea id="noticeText" placeholder="Type your notice or remark here... (e.g. 'Market is closed today due to holiday.')"></textarea>
+            <p class="notice-hint">💡 When toggle is <strong>ON</strong>, users will see this as a popup when they open the Live Rates page.</p>
+        </div>
+
         <div id="content">
             <!-- Dynamic Groups will be inserted here -->
         </div>
@@ -65,7 +145,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
-        // Your Firebase config precisely ported from the React Native app
         const firebaseConfig = {
             apiKey: "AIzaSyBRaCm8nP_rmN9QNQMAPg0ebKmN5nHKp1Q",
             authDomain: "sjapp-30321.firebaseapp.com",
@@ -103,8 +182,17 @@
         const contentDiv = document.getElementById('content');
         const saveBtn = document.getElementById('saveBtn');
         const statusInd = document.getElementById('statusIndicator');
+        const noticeToggle = document.getElementById('noticeToggle');
+        const noticeText = document.getElementById('noticeText');
+        const noticeStatusBadge = document.getElementById('noticeStatusBadge');
 
-        // Render HTML structure
+        // Update badge label when toggle changes
+        noticeToggle.addEventListener('change', () => {
+            noticeStatusBadge.textContent = noticeToggle.checked ? 'ON' : 'OFF';
+            noticeStatusBadge.className = 'notice-status-badge' + (noticeToggle.checked ? ' on' : '');
+        });
+
+        // Render HTML structure for rate groups
         for (const [groupName, keys] of Object.entries(groups)) {
             const section = document.createElement('div');
             section.innerHTML = `<h2 class="section-title">${groupName}</h2>`;
@@ -147,18 +235,26 @@
                         }
                     });
 
-                    // Set checkbox toggles
-                    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                    // Set checkbox toggles for visibility
+                    const checkboxes = document.querySelectorAll('input[data-visible-key]');
                     checkboxes.forEach(cb => {
                         const key = cb.getAttribute('data-visible-key');
                         const visibleKey = key + '_visible';
-                        // Default to checked (true) if the field doesn't exist yet
                         if (data[visibleKey] !== undefined) {
                             cb.checked = data[visibleKey];
                         } else {
                             cb.checked = true;
                         }
                     });
+
+                    // Set notice remark fields
+                    if (data['notice_text'] !== undefined) {
+                        noticeText.value = data['notice_text'];
+                    }
+                    const noticeActive = data['notice_active'] === true;
+                    noticeToggle.checked = noticeActive;
+                    noticeStatusBadge.textContent = noticeActive ? 'ON' : 'OFF';
+                    noticeStatusBadge.className = 'notice-status-badge' + (noticeActive ? ' on' : '');
                 }
                 statusInd.textContent = "Connected to Live App";
                 statusInd.className = "status connected";
@@ -179,7 +275,7 @@
 
         saveBtn.addEventListener('click', async () => {
             saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving Context...';
+            saveBtn.textContent = 'Saving...';
             
             const dataToSave = {};
             
@@ -191,12 +287,16 @@
                 dataToSave[key] = val === "" ? "0" : val;
             });
 
-            // Collect toggle values
-            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            // Collect toggle values for visibility
+            const checkboxes = document.querySelectorAll('input[data-visible-key]');
             checkboxes.forEach(cb => {
                 const key = cb.getAttribute('data-visible-key');
                 dataToSave[key + '_visible'] = cb.checked;
             });
+
+            // Collect notice / remark values
+            dataToSave['notice_text'] = noticeText.value.trim();
+            dataToSave['notice_active'] = noticeToggle.checked;
 
             try {
                 await setDoc(adjustmentsDocRef, dataToSave, { merge: true });
@@ -210,7 +310,6 @@
             }
         });
 
-        // Initialize fetching on page load
         fetchInitialData();
     </script>
 </body>
